@@ -4,11 +4,12 @@ import { Topic } from "@/types/news";
 import { deleteTopicAction } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Plus, Newspaper, Clock, Search } from "lucide-react";
+import { Pencil, Trash2, Plus, Newspaper, Clock, Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import TopicForm from "./topic-form";
+import { createClient } from "@supabase/supabase-js";
 
 interface AdminTopicsTableProps {
   topics: Topic[];
@@ -23,6 +24,39 @@ export default function AdminTopicsTable({
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [crawlingId, setCrawlingId] = useState<string | null>(null);
+  const [crawlMessage, setCrawlMessage] = useState<{ id: string; text: string; isError: boolean } | null>(null);
+
+  const handleRecrawl = async (topic: Topic) => {
+    setCrawlingId(topic.id);
+    setCrawlMessage(null);
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      const { data, error } = await supabase.functions.invoke(
+        "supabase-functions-crawl-topic",
+        { body: { topic_id: topic.id, topic_title: topic.title } }
+      );
+      if (error) throw error;
+      setCrawlMessage({
+        id: topic.id,
+        text: `Crawled ${data?.inserted ?? 0} articles`,
+        isError: false,
+      });
+      setTimeout(() => setCrawlMessage(null), 4000);
+    } catch (err) {
+      setCrawlMessage({
+        id: topic.id,
+        text: "Crawl failed — try again",
+        isError: true,
+      });
+      setTimeout(() => setCrawlMessage(null), 4000);
+    } finally {
+      setCrawlingId(null);
+    }
+  };
 
   const filteredTopics = topics.filter(
     (topic) =>
@@ -250,6 +284,25 @@ export default function AdminTopicsTable({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRecrawl(topic)}
+                    disabled={crawlingId === topic.id}
+                    className="h-8 w-8"
+                    title="Re-crawl web for articles"
+                    style={{ color: crawlingId === topic.id ? "var(--chronos-accent)" : "var(--chronos-text-muted)" }}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${crawlingId === topic.id ? "animate-spin" : ""}`} />
+                  </Button>
+                  {crawlMessage?.id === topic.id && (
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: crawlMessage.isError ? "#dc2626" : "#16a34a" }}
+                    >
+                      {crawlMessage.text}
+                    </span>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
