@@ -5,6 +5,29 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../supabase/server";
 import { revalidatePath } from "next/cache";
 
+async function triggerTopicCrawl(topicId: string, topicTitle: string) {
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_KEY;
+    if (!supabaseUrl || !serviceKey) return;
+
+    await fetch(
+      `${supabaseUrl}/functions/v1/supabase-functions-crawl-topic`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({ topic_id: topicId, topic_title: topicTitle }),
+      }
+    );
+  } catch {
+    // Non-blocking — crawl failure should not block topic creation
+  }
+}
+
 export const adminSignUpAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
@@ -110,22 +133,27 @@ export const createTopicAction = async (formData: FormData) => {
     return encodedRedirect("error", "/admin", "Title and summary are required");
   }
 
-  const { error } = await supabase.from("topics").insert({
+  const { data: newTopic, error } = await supabase.from("topics").insert({
     title,
     summary,
     slug,
     category: category || "Technology",
     total_sources: 0,
     last_updated: new Date().toISOString(),
-  });
+  }).select("id").single();
 
   if (error) {
     return encodedRedirect("error", "/admin", `Failed to create topic: ${error.message}`);
   }
 
+  // Fire-and-forget: crawl the web for articles related to this topic
+  if (newTopic?.id) {
+    triggerTopicCrawl(newTopic.id, title);
+  }
+
   revalidatePath("/admin");
   revalidatePath("/");
-  return redirect("/admin?success=Topic created successfully");
+  return redirect("/admin?success=Topic created — crawling web for articles…");
 };
 
 export const updateTopicAction = async (formData: FormData) => {
