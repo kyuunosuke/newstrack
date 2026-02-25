@@ -1,4 +1,4 @@
-import { adminSignInAction } from "@/app/actions/admin";
+import { adminSignInAction, adminSignUpAction } from "@/app/actions/admin";
 import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
@@ -7,11 +7,12 @@ import { Shield } from "lucide-react";
 import Link from "next/link";
 
 interface AdminLoginProps {
-  searchParams: Promise<Message & { error?: string }>;
+  searchParams: Promise<Message & { error?: string; mode?: string }>;
 }
 
 export default async function AdminLoginPage({ searchParams }: AdminLoginProps) {
-  const message = await searchParams;
+  const params = await searchParams;
+  const isSignUp = params.mode === "signup";
 
   return (
     <div
@@ -43,13 +44,15 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginProps) 
               className="text-3xl font-semibold tracking-tight"
               style={{ color: "var(--chronos-text)" }}
             >
-              Admin Login
+              {isSignUp ? "Admin Sign Up" : "Admin Login"}
             </h1>
             <p
               className="text-sm"
               style={{ color: "var(--chronos-text-muted)" }}
             >
-              Sign in with your admin credentials
+              {isSignUp
+                ? "Create an admin account"
+                : "Sign in with your admin credentials"}
             </p>
           </div>
 
@@ -99,21 +102,58 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginProps) 
             </div>
           </div>
 
-          <SubmitButton
-            className="w-full font-medium"
-            pendingText="Signing in..."
-            formAction={adminSignInAction}
-            style={{
-              backgroundColor: "var(--chronos-accent)",
-              color: "white",
-            }}
-          >
-            Sign in as Admin
-          </SubmitButton>
+          {isSignUp ? (
+            <SubmitButton
+              className="w-full font-medium"
+              pendingText="Creating account..."
+              formAction={adminSignUpAction}
+              style={{
+                backgroundColor: "var(--chronos-accent)",
+                color: "white",
+              }}
+            >
+              Create Admin Account
+            </SubmitButton>
+          ) : (
+            <SubmitButton
+              className="w-full font-medium"
+              pendingText="Signing in..."
+              formAction={adminSignInAction}
+              style={{
+                backgroundColor: "var(--chronos-accent)",
+                color: "white",
+              }}
+            >
+              Sign in as Admin
+            </SubmitButton>
+          )}
 
-          <FormMessage message={message} />
+          <FormMessage message={params} />
 
-          <div className="text-center">
+          <div className="flex flex-col items-center gap-2 text-center text-sm">
+            {isSignUp ? (
+              <p style={{ color: "var(--chronos-text-muted)" }}>
+                Already have an account?{" "}
+                <Link
+                  href="/admin/login"
+                  className="font-medium hover:underline transition-all"
+                  style={{ color: "var(--chronos-accent)" }}
+                >
+                  Sign in
+                </Link>
+              </p>
+            ) : (
+              <p style={{ color: "var(--chronos-text-muted)" }}>
+                Need an admin account?{" "}
+                <Link
+                  href="/admin/login?mode=signup"
+                  className="font-medium hover:underline transition-all"
+                  style={{ color: "var(--chronos-accent)" }}
+                >
+                  Sign up
+                </Link>
+              </p>
+            )}
             <Link
               href="/"
               className="text-sm hover:underline transition-all"

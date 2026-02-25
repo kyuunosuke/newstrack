@@ -5,6 +5,40 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../supabase/server";
 import { revalidatePath } from "next/cache";
 
+export const adminSignUpAction = async (formData: FormData) => {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const supabase = await createClient();
+
+  if (!email || !password) {
+    return encodedRedirect("error", "/admin/login", "Email and password are required");
+  }
+
+  const { data, error } = await supabase.auth.signUp({ email, password });
+
+  if (error) {
+    return encodedRedirect("error", "/admin/login", error.message);
+  }
+
+  if (!data.user) {
+    return encodedRedirect("error", "/admin/login", "Sign up failed — please try again");
+  }
+
+  // Grant admin privileges immediately
+  const { error: insertError } = await supabase
+    .from("admin_users")
+    .insert({ user_id: data.user.id });
+
+  if (insertError) {
+    return encodedRedirect("error", "/admin/login", `Could not grant admin privileges: ${insertError.message}`);
+  }
+
+  // Sign in right away
+  await supabase.auth.signInWithPassword({ email, password });
+
+  return redirect("/admin");
+};
+
 export const adminSignInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
