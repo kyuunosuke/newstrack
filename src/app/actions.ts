@@ -44,15 +44,17 @@ export const signUpAction = async (formData: FormData) => {
     try {
       const { error: updateError } = await supabase
         .from('users')
-        .insert({
-          id: user.id,
-          name: fullName,
-          full_name: fullName,
-          email: email,
-          user_id: user.id,
-          token_identifier: user.id,
-          created_at: new Date().toISOString()
-        });
+        .upsert(
+          {
+            id: user.id,
+            name: fullName,
+            full_name: fullName,
+            email,
+            user_id: user.id,
+            token_identifier: user.id,
+          },
+          { onConflict: 'id' },
+        );
 
       if (updateError) {
         console.error('Error updating user profile:', updateError);
@@ -74,13 +76,26 @@ export const signInAction = async (formData: FormData) => {
   const password = formData.get("password") as string;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
     return encodedRedirect("error", "/sign-in", error.message);
+  }
+
+  // Check if user is admin — redirect to admin portal
+  if (data.user) {
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("id")
+      .eq("user_id", data.user.id)
+      .single();
+
+    if (adminUser) {
+      return redirect("/admin");
+    }
   }
 
   return redirect("/dashboard");

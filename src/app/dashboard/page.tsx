@@ -16,6 +16,17 @@ export default async function Dashboard() {
     return redirect("/sign-in");
   }
 
+  // Check if user is admin — redirect to admin portal
+  const { data: adminUser } = await supabase
+    .from("admin_users")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (adminUser) {
+    return redirect("/admin");
+  }
+
   // Get user's followed topics
   const { data: follows } = await supabase
     .from("user_follows")
