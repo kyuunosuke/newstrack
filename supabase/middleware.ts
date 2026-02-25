@@ -47,6 +47,24 @@ export const updateSession = async (request: NextRequest) => {
       return NextResponse.redirect(new URL("/sign-in", request.url));
     }
 
+    // admin routes protection
+    if (request.nextUrl.pathname.startsWith("/admin") && !request.nextUrl.pathname.startsWith("/admin/login")) {
+      if (error || !user) {
+        return NextResponse.redirect(new URL("/admin/login", request.url));
+      }
+      
+      // Check if user is admin
+      const { data: adminUser } = await supabase
+        .from("admin_users")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (!adminUser) {
+        return NextResponse.redirect(new URL("/admin/login?error=not_admin", request.url));
+      }
+    }
+
     if (request.nextUrl.pathname === "/" && !error) {
       return NextResponse.redirect(new URL("/", request.url));
     }
